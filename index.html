@@ -1,1 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mini Cricket Arcade</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #2c3e50; color: white; text-align: center; margin: 0; overflow: hidden; }
+        canvas { background: #27ae60; border: 5px solid #2ecc71; border-radius: 10px; cursor: crosshair; display: block; margin: 20px auto; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
+        .ui { position: absolute; top: 20px; left: 20px; text-align: left; background: rgba(0,0,0,0.6); padding: 15px; border-radius: 8px; pointer-events: none; }
+        .leaderboard { position: absolute; top: 20px; right: 20px; background: rgba(0,0,0,0.6); padding: 15px; border-radius: 8px; min-width: 150px; }
+        h2 { margin-top: 0; color: #f1c40f; }
+        .msg { font-size: 24px; font-weight: bold; margin-top: 10px; color: #f1c40f; }
+    </style>
+</head>
+<body>
 
+    <div class="ui">
+        <h2>Score: <span id="score">0</span></h2>
+        <p>Click to Swing the Bat!</p>
+        <div id="status" class="msg">READY?</div>
+    </div>
+
+    <div class="leaderboard">
+        <h3>Top Scorers</h3>
+        <ul id="highScores" style="list-style: none; padding: 0;"></ul>
+    </div>
+
+    <canvas id="gameCanvas" width="600" height="400"></canvas>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const scoreEl = document.getElementById('score');
+    const statusEl = document.getElementById('status');
+    const highScoreList = document.getElementById('highScores');
+
+    // Game Variables
+    let score = 0;
+    let ball = { x: 600, y: 200, speed: 5, active: false };
+    let bat = { x: 50, y: 200, width: 10, height: 60, swinging: false };
+    let gameOver = false;
+
+    // Leaderboard Logic
+    let leaderboard = JSON.parse(localStorage.getItem('cricketScores')) || [];
+
+    function updateLeaderboard() {
+        highScoreList.innerHTML = '';
+        leaderboard.sort((a, b) => b - a).slice(0, 5).forEach(s => {
+            const li = document.createElement('li');
+            li.textContent = `${s} Runs`;
+            highScoreList.appendChild(li);
+        });
+    }
+
+    function saveScore(finalScore) {
+        if (finalScore > 0) {
+            leaderboard.push(finalScore);
+            localStorage.setItem('cricketScores', JSON.stringify(leaderboard));
+            updateLeaderboard();
+        }
+    }
+
+    // Interaction
+    canvas.addEventListener('mousedown', () => {
+        if (gameOver) {
+            resetGame();
+        } else {
+            bat.swinging = true;
+            setTimeout(() => bat.swinging = false, 150);
+        }
+    });
+
+    function resetGame() {
+        score = 0;
+        ball.speed = 5;
+        gameOver = false;
+        scoreEl.textContent = score;
+        statusEl.textContent = "PLAY!";
+        spawnBall();
+    }
+
+    function spawnBall() {
+        ball.x = 600;
+        ball.y = 150 + Math.random() * 100;
+        ball.active = true;
+        ball.speed += 0.2; // Increase difficulty
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Draw Pitch lines
+        ctx.strokeStyle = "white";
+        ctx.setLineDash([5, 15]);
+        ctx.beginPath(); ctx.moveTo(100, 0); ctx.lineTo(100, 400); ctx.stroke();
+
+        // Draw Bat
+        ctx.fillStyle = bat.swinging ? "#e67e22" : "#8b4513";
+        ctx.fillRect(bat.x, bat.y - bat.height/2, bat.width, bat.height);
+
+        // Draw Ball
+        if (ball.active) {
+            ctx.fillStyle = "red";
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, 8, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ball.x -= ball.speed;
+
+            // Collision Detection
+            if (ball.x <= bat.x + bat.width && ball.x >= bat.x && 
+                ball.y >= bat.y - bat.height/2 && ball.y <= bat.y + bat.height/2) {
+                
+                if (bat.swinging) {
+                    score += 4;
+                    scoreEl.textContent = score;
+                    statusEl.textContent = "FOUR!";
+                    ball.active = false;
+                    setTimeout(spawnBall, 500);
+                }
+            }
+
+            // Missed ball
+            if (ball.x < 0) {
+                ball.active = false;
+                statusEl.textContent = "BOWLED! Click to Restart";
+                saveScore(score);
+                gameOver = true;
+            }
+        }
+
+        requestAnimationFrame(draw);
+    }
+
+    // Initial Start
+    updateLeaderboard();
+    spawnBall();
+    draw();
+</script>
+</body>
+</html>
